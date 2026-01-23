@@ -6,6 +6,7 @@ class SimplePlayer(QObject):
         super().__init__()
         self.vlc_instance = vlc.Instance('--no-video')
         self.player = self.vlc_instance.media_player_new()
+        self.player.audio_set_volume(50)
 
     def play_url(self, url: str):
         media = self.vlc_instance.media_new(url)

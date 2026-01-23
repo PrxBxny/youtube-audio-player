@@ -1,10 +1,12 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QLineEdit
 from core.player import SimplePlayer
+from core.youtube import YouTubeExtractor
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.player = SimplePlayer()
+        self.extractor = None
 
         self.setWindowTitle("Music Player MVP")
         self.setGeometry(100, 100, 400, 200)
@@ -33,8 +35,19 @@ class MainWindow(QMainWindow):
         if url:
             self.play_btn.setEnabled(False)
             self.play_btn.setText("Загрузка...")
-            # Пока просто передаем URL напрямую
-            # YouTube интеграцию добавим позже
-            self.player.play_url(url)
-            self.play_btn.setEnabled(True)
-            self.play_btn.setText("▶ Play")
+            # Создаем экстрактор
+            self.extractor = YouTubeExtractor(url)
+            self.extractor.audio_url_ready.connect(self.on_audio_ready)
+            self.extractor.error.connect(self.on_error)
+            self.extractor.start()
+
+
+    def on_audio_ready(self, audio_url: str):
+        self.player.play_url(audio_url)
+        self.play_btn.setEnabled(True)
+        self.play_btn.setText("▶ Play")
+
+    def on_error(self, error: str):
+        print(f"Ошибка: {error}")
+        self.play_btn.setEnabled(True)
+        self.play_btn.setText("▶ Play (Ошибка!)")
