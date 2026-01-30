@@ -14,6 +14,11 @@ class YouTubeExtractor(QThread):
             ydl_opts = {
                 'format': 'bestaudio',
                 'quiet': True,
+                'socket_timeout': 30,
+
+                # Оптимизация
+                'extract_flat': False, # Полные данные
+                'skip_download': True, # Не скачиваем, только метаданные
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
