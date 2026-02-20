@@ -24,14 +24,26 @@ class YouTubeExtractor(QThread):
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(self.youtube_url, download=False)
+
                 # получаем и передаем ссылку на аудио
                 audio_url = info['url']
+                if not audio_url:
+                    raise ValueError("Не удалось получить аудио URL")
                 self.audio_url_ready.emit(audio_url)
+
                 # Получаем и передаем ссылку на превью
                 thumbnail_url = info.get('thumbnail')
-                response = requests.get(thumbnail_url)
-                self.thumbnail_bytes_ready.emit(response.content)
-
+                if thumbnail_url:
+                    try:
+                        response = requests.get(
+                            thumbnail_url,
+                            timeout=10,
+                            stream=True # Не загружаем сразу все в память
+                        )
+                        response.raise_for_status()  # Проверка статуса
+                        self.thumbnail_bytes_ready.emit(response.content)
+                    except Exception as e:
+                        self.error.emit(f"YouTube extraction error: {str(e)}")
 
         except Exception as e:
             self.error.emit(str(e))

@@ -1,12 +1,18 @@
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 import vlc
 
 class Player(QObject):
     state_changed = pyqtSignal(str)
+    playback_changed = pyqtSignal(vlc.PlaybackMode)
+    position_changed = pyqtSignal(float)
 
     STATE_STOPPED = 'stopped'
     STATE_PLAYING = 'playing'
     STATE_PAUSED = 'paused'
+
+    PLAYBACK_DEFAULT = vlc.PlaybackMode.default
+    PLAYBACK_LOOP = vlc.PlaybackMode.loop
+    PLAYBACK_REPEAT = vlc.PlaybackMode.repeat
 
     def __init__(self):
         super().__init__()
@@ -21,8 +27,17 @@ class Player(QObject):
         self.player.audio_set_volume(50)
 
         self._state = self.STATE_STOPPED
+        self._playback_mode = self.PLAYBACK_DEFAULT
 
         self._setup_vlc_events()
+
+        # Таймер для опроса состояния
+        self._last_pos = 0.0
+        self._timer = QTimer()
+        self._timer.setInterval(300)
+        self._timer.timeout.connect(self._emit_position)
+        self._timer.start()
+
 
     def _setup_vlc_events(self):
         event_manager = self.player.event_manager()
@@ -49,6 +64,14 @@ class Player(QObject):
 
             self.state_changed.emit(new_state) # emit - отправление сигнала всем слушателям
             print(f"сигнал отправлен: state_changed('{new_state}')")
+
+    def _emit_position(self):
+        if self.state == self.STATE_PLAYING:
+            current_pos = self.player.get_position()
+            if abs(current_pos - self._last_pos) > 0.001:
+                self._last_pos = current_pos
+                self.position_changed.emit(current_pos)
+
 
     @property
     def state(self):
@@ -82,8 +105,18 @@ class Player(QObject):
     def previous(self):
         self.list_player.previous()
 
-    def repeat(self):
-        self.list_player.set_playback_mode(vlc.PlaybackMode.loop)
+    def switch_playback_mode(self):
+        if self._playback_mode == self.PLAYBACK_DEFAULT:
+            self._playback_mode = self.PLAYBACK_LOOP
+        elif self._playback_mode == self.PLAYBACK_LOOP:
+            self._playback_mode = self.PLAYBACK_REPEAT
+        elif self._playback_mode == self.PLAYBACK_REPEAT:
+            self._playback_mode = self.PLAYBACK_DEFAULT
+
+        self.list_player.set_playback_mode(self._playback_mode)
+        print(f"switch_playback_mode меняет мод на: {self._playback_mode}")
+        self.playback_changed.emit(self._playback_mode)
+        print(f"сигнал отправлен: playback_changed('{self._playback_mode}')")
 
     def volume_changed(self, volume: int):
         self.player.audio_set_volume(volume)

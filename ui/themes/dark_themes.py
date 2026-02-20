@@ -1,3 +1,6 @@
+import ctypes
+import platform
+
 DARK_THEME = """
 QWidget {
     background-color: #2b2b2b;
@@ -675,3 +678,22 @@ QStatusBar {
     color: #e0e0e0;
 }
 """
+
+def set_dark_title_bar(window):
+    # DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+    # Эта константа говорит Windows включить темную тему для заголовка
+    if platform.system() != "Windows":
+        return
+    try:
+        # Пытаемся применить атрибут (работает на Windows 10 build 19041+ и Windows 11)
+        hwnd = int(window.winId())
+        value = ctypes.c_int(1) # 1 = включить, 0 = выключить
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, 20, ctypes.byref(value), ctypes.sizeof(value)
+        )
+    except Exception as e:
+        print(f"Не удалось применить темную тему: {e}")
+
+def apply_dark_theme(window):
+    window.setStyleSheet(EXTRA_DARK_THEME)
+    set_dark_title_bar(window)
