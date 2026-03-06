@@ -3,7 +3,7 @@
 [![Английский](https://img.shields.io/badge/lang-en-blue)](README.md)
 [![Русский](https://img.shields.io/badge/lang-ru-red)](README.ru.md)
 
-<!-- ![YT Audio Player Screenshot](resources/preview_new.jpg) -->
+![YT Audio Player Screenshot](resources/for_readme.PNG)
 
 **YT Audio Player** — это десктопное приложение написанное на Python, которое позволяет слушать аудио из YouTube, не открывая браузер. Главная цель проекта — снизить нагрузку на системные ресурсы (CPU/RAM) при прослушивании музыки, обеспечив при этом простой и понятный интерфейс.
 
