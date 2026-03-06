@@ -1,4 +1,5 @@
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from core.config import DEFAULT_VOLUME, POSITION_POLL_INTERVAL_MS, POSITION_CHANGE_THRESHOLD
 import vlc
 
 class Player(QObject):
@@ -24,7 +25,7 @@ class Player(QObject):
         self.playlist = self.vlc_instance.media_list_new() # Создаем плейлист
         self.list_player.set_media_list(self.playlist) # Подключаем лист плеер к плейлисту
 
-        self.player.audio_set_volume(50)
+        self.player.audio_set_volume(DEFAULT_VOLUME)
 
         self._state = self.STATE_STOPPED
         self._playback_mode = self.PLAYBACK_DEFAULT
@@ -34,7 +35,7 @@ class Player(QObject):
         # Таймер для опроса состояния
         self._last_pos = 0.0
         self._timer = QTimer()
-        self._timer.setInterval(300)
+        self._timer.setInterval(POSITION_POLL_INTERVAL_MS)
         self._timer.timeout.connect(self._emit_position)
         self._timer.start()
 
@@ -68,7 +69,7 @@ class Player(QObject):
     def _emit_position(self):
         if self.state == self.STATE_PLAYING:
             current_pos = self.player.get_position()
-            if abs(current_pos - self._last_pos) > 0.001:
+            if abs(current_pos - self._last_pos) > POSITION_CHANGE_THRESHOLD:
                 self._last_pos = current_pos
                 self.position_changed.emit(current_pos)
 
@@ -120,6 +121,14 @@ class Player(QObject):
 
     def volume_changed(self, volume: int):
         self.player.audio_set_volume(volume)
+
+    def get_duration(self, formated = False):
+        duration = int(self.player.get_length() / 1000) # в секундах
+        if not formated:
+            return duration
+        if formated:
+            mins, secs = divmod(duration, 60)
+            return f"{mins:02}:{secs:02}"
 
     def clear_playlist(self):
         self.stop()

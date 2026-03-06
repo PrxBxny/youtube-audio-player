@@ -1,8 +1,14 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QLabel, QLineEdit, QSlider
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from core import Player, YouTubeExtractor
 import vlc
+
+
+WINDOW_GEOMETRY = (300, 300, 340, 400)
+TIME_SLIDER_SCALE = 1000
+THUMBNAIL_SIZE = 280
+DEFAULT_VOLUME = 50
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -13,9 +19,8 @@ class MainWindow(QMainWindow):
         self.is_extracting = False
 
         self.setWindowTitle("YT Audio Player")
-        self.setGeometry(300, 300, 360, 400)
+        self.setGeometry(*WINDOW_GEOMETRY)
         self.setWindowIcon(QIcon("resources/negative_icon.ico"))
-        # set_dark_title_bar(self)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -29,18 +34,33 @@ class MainWindow(QMainWindow):
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.image_label)
 
-        self.qpixmap = QPixmap('resources/preview_new.jpg')
-        self.image_label.setPixmap(self.qpixmap.scaled(280, 280, Qt.AspectRatioMode.KeepAspectRatio))
+        self.qpixmap = QPixmap('resources/preview.jpg')
+        self.image_label.setPixmap(self.qpixmap.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio))
+
+        # Отдельный виджет для duration бара
+        duration_widget = QWidget()
+        layout.addWidget(duration_widget)
+        # Лэйаут для таймбара
+        duration_layout = QHBoxLayout()
+        duration_widget.setLayout(duration_layout)
+        duration_widget.setMaximumHeight(50)
 
         # Слайдер продолжительности трека
         self.time_slider = QSlider(Qt.Orientation.Horizontal)
-        self.time_slider.setRange(0, 1000)
+        self.time_slider.setRange(0, TIME_SLIDER_SCALE)
         self.time_slider.setValue(0)
-        layout.addWidget(self.time_slider)
+        self._connect_slider_signals()
+        duration_layout.addWidget(self.time_slider)
+
+        # Текст продолжительности трека
+        self.time_label = QLabel("00:00/00:00")
+        self.time_label.setStyleSheet("font-size: 12px;")
+        duration_layout.addWidget(self.time_label)
 
         # Поле ввода URL
         self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Вставь YouTube URL...")
+        self.url_input.setPlaceholderText("Enter YouTube URL...")
+        self.url_input.setStyleSheet("font-size: 12px;")
         layout.addWidget(self.url_input)
 
         # Кнопка Add URL
@@ -89,7 +109,7 @@ class MainWindow(QMainWindow):
         # Ползунок громкости
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
+        self.volume_slider.setValue(DEFAULT_VOLUME)
         self.volume_slider.valueChanged.connect(lambda val: self.player.volume_changed(val))
         layout.addWidget(self.volume_slider)
 
@@ -104,11 +124,11 @@ class MainWindow(QMainWindow):
             return
 
         if 'youtube.com' not in url and 'youtu.be' not in url:
-            self.on_error("Это не YouTube URL!")
+            self.on_error("It's not YouTube URL!")
             return
 
         if self.is_extracting:
-            print("Уже идет загрузка, подожди...")
+            print("Loading, wait...")
             return
 
         if self.extractor and self.extractor.isRunning():
@@ -117,14 +137,17 @@ class MainWindow(QMainWindow):
 
         self.is_extracting = True
         self.add_url_btn.setEnabled(False)
-        self.add_url_btn.setText("Загрузка...")
+        self.add_url_btn.setText("Loading...")
         # Создаем экстрактор
         self.extractor = YouTubeExtractor(url)
+        self._connect_extractor_signals()
+        self.extractor.start()
+
+    def _connect_extractor_signals(self):
         self.extractor.audio_url_ready.connect(self.on_audio_ready)
         self.extractor.thumbnail_bytes_ready.connect(self.on_thumbnail_ready)
         self.extractor.error.connect(self.on_error)
         self.extractor.finished.connect(self.on_extraction_finished)
-        self.extractor.start()
 
     def on_extraction_finished(self):
         """Вызывается когда поток завершился"""
@@ -139,13 +162,13 @@ class MainWindow(QMainWindow):
         self.add_url_btn.setIcon(QIcon("resources/negative_musical-note.ico"))
 
     def on_error(self, error: str):
-        print(f"Ошибка: {error}")
+        print(f"Error: {error}")
         self.add_url_btn.setEnabled(True)
-        self.add_url_btn.setText("▶ Play (Ошибка!)")
+        self.add_url_btn.setText("▶ Play (Erroe!)")
 
     def on_thumbnail_ready(self, thumbnail_bytes: bytes):
         self.qpixmap.loadFromData(thumbnail_bytes)
-        self.image_label.setPixmap(self.qpixmap.scaled(280, 280, Qt.AspectRatioMode.KeepAspectRatio))
+        self.image_label.setPixmap(self.qpixmap.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio))
 
     def on_player_state_changed(self, new_state: str):
         print(f'получен сигнал со статусом: {new_state}')
@@ -168,6 +191,33 @@ class MainWindow(QMainWindow):
 
         self.repeat_btn.setText(btn_text)
 
+    def _connect_slider_signals(self):
+        self.slider_is_being_dragged = False
+        self.time_slider.sliderPressed.connect(self.on_slider_pressed)
+        self.time_slider.sliderReleased.connect(self.on_slider_released)
+
+    def on_slider_pressed(self):
+        self.slider_is_being_dragged = True
+
+    def on_slider_released(self):
+        self.slider_is_being_dragged = False
+
+        new_position = self.time_slider.value() / TIME_SLIDER_SCALE
+        self.player.player.set_position(new_position)
+
     def on_position_changed(self, pos: float):
-        new_value = int(pos * 1000)
-        self.time_slider.setValue(new_value)
+        if not self.slider_is_being_dragged:
+            # Меняем позицию слайдера
+            new_value = int(pos * TIME_SLIDER_SCALE)
+            self.time_slider.setValue(new_value)
+
+        # # Меняем текст
+        end_duration_formated = self.player.get_duration(formated = True) # Конец трека
+
+        duration_secs = self.player.get_duration(formated = False) # Вся продолжительность
+        current_duration_secs = int(duration_secs * pos) # Текущяя продолжительность
+        mins, secs = divmod(current_duration_secs, 60)
+        currnet_duration_formated = f"{mins:02}:{secs:02}" # Текущее время
+
+        new_text = f'{currnet_duration_formated}/{end_duration_formated}'
+        self.time_label.setText(new_text)

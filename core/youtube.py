@@ -1,5 +1,7 @@
 from PyQt6.QtCore import QThread, pyqtSignal
+from core.config import YDL_OPTIONS, THUMBNAIL_REQUEST_TIMEOUT
 import yt_dlp, requests
+
 
 class YouTubeExtractor(QThread):
     audio_url_ready = pyqtSignal(str)  # Сигнал с URL
@@ -12,17 +14,7 @@ class YouTubeExtractor(QThread):
 
     def run(self):
         try:
-            ydl_opts = {
-                'format': 'bestaudio',
-                'quiet': True,
-                'socket_timeout': 30,
-
-                # Оптимизация
-                'extract_flat': False, # Полные данные
-                'skip_download': True, # Не скачиваем, только метаданные
-            }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(self.youtube_url, download=False)
 
                 # получаем и передаем ссылку на аудио
@@ -44,6 +36,8 @@ class YouTubeExtractor(QThread):
                         self.thumbnail_bytes_ready.emit(response.content)
                     except Exception as e:
                         self.error.emit(f"YouTube extraction error: {str(e)}")
+
+                # Получаем
 
         except Exception as e:
             self.error.emit(str(e))
